@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickCode Pro - Professional UI</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        :root { --primary: #6366f1; --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; --border: #e5e7eb; }
+        .dark-mode { --bg: #111827; --card: #1f2937; --text: #f9fafb; --border: #374151; }
+
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; transition: 0.3s; }
+        .container { background: var(--card); padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 850px; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+        .logo { font-size: 22px; font-weight: 700; color: var(--primary); }
+        
+        textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; margin-bottom: 20px; resize: none; background: var(--card); color: var(--text); }
+        
+        .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .controls label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; }
+        
+        .type-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+        .type-selector button { flex: 1; padding: 10px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; background: var(--card); color: var(--text); transition: 0.3s; }
+        .type-selector button.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .preset-colors { display: flex; gap: 8px; margin-top: 10px; margin-bottom: 20px; }
+        .color-circle { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: 0.2s; }
+        .color-circle:hover { transform: scale(1.1); }
+
+        .output-area { border: 2px dashed var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.02); }
+        #code-render { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; flex-direction: column; align-items: center; }
+        
+        .btn { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; width: 100%; margin-top: 10px; }
+        .btn-download { background: var(--primary); color: white; }
+        .btn-add { background: #e0e7ff; color: var(--primary); }
+        .btn-zip { background: #10b981; color: white; flex: 2; }
+        .btn-mode { background: var(--border); color: var(--text); padding: 5px 15px; width: auto; font-size: 12px; }
+
+        .batch-list-box { margin-top: 30px; border: 1px solid var(--border); border-radius: 8px; padding: 15px; }
+        .item-row { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .action-btns { display: flex; gap: 10px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="logo">QuickCode Pro UI</div>
+        <button class="btn btn-mode" onclick="document.body.classList.toggle('dark-mode')">🌓 Toggle Dark Mode</button>
+    </header>
+
+    <textarea id="textInput" rows="2" placeholder="Enter text for Code..." oninput="updatePreview()">QuickCode_1</textarea>
+
+    <div class="main-grid">
+        <div class="controls">
+            <label>Code Type</label>
+            <div class="type-selector">
+                <button id="qrBtn" class="active" onclick="setMode('qr')">QR Code</button>
+                <button id="barBtn" onclick="setMode('barcode')">Barcode</button>
+            </div>
+
+            <label>Select Color</label>
+            <input type="color" id="mainColor" value="#000000" onchange="updatePreview()" style="width:100%; height:35px; border:none; cursor:pointer; background:none;">
+            <div class="preset-colors">
+                <div class="color-circle" style="background:#000000" onclick="setColor('#000000')"></div>
+                <div class="color-circle" style="background:#6366f1" onclick="setColor('#6366f1')"></div>
+                <div class="color-circle" style="background:#ef4444" onclick="setColor('#ef4444')"></div>
+                <div class="color-circle" style="background:#22c55e" onclick="setColor('#22c55e')"></div>
+            </div>
+
+            <button class="btn btn-add" onclick="addToBatch()">➕ Add to Batch List</button>
+        </div>
+
+        <div class="output-area">
+            <div id="code-render">
+                <div id="qrcode"></div>
+                <canvas id="barcodeCanvas" style="display:none;"></canvas>
+            </div>
+            <button class="btn btn-download" onclick="downloadPreview()">💾 Download Image (JPG)</button>
+        </div>
+    </div>
+
+    <div class="batch-list-box">
+        <label>Batch Queue (<span id="batchCount">0</span> Items)</label>
+        <div id="batchItems" style="max-height: 150px; overflow-y: auto; margin-top: 10px;"></div>
+        <div class="action-btns">
+            <button id="downloadZip" class="btn btn-zip" onclick="generateZip()" disabled>📦 Download All as ZIP</button>
+            <button class="btn" style="background:#fee2e2; color:#ef4444; flex:1;" onclick="clearBatch()">🗑️ Clear</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentMode = 'qr';
+    let batchData = [];
+
+    function setMode(mode) {
+        currentMode = mode;
+        document.getElementById('qrBtn').className = mode === 'qr' ? 'active' : '';
+        document.getElementById('barBtn').className = mode === 'barcode' ? 'active' : '';
+        updatePreview();
+    }
+
+    function setColor(color) {
+        document.getElementById('mainColor').value = color;
+        updatePreview();
+    }
+
+    function updatePreview() {
+        const text = document.getElementById('textInput').value || "Sample";
+        const color = document.getElementById('mainColor').value;
+        const qrDiv = document.getElementById('qrcode');
+        const barCanvas = document.getElementById('barcodeCanvas');
+
+        qrDiv.innerHTML = "";
+        if (currentMode === 'qr') {
+            qrDiv.style.display = "block";
+            barCanvas.style.display = "none";
+            new QRCode(qrDiv, { text: text, width: 200, height: 200, colorDark: color });
+        } else {
+            qrDiv.style.display = "none";
+            barCanvas.style.display = "block";
+            JsBarcode(barCanvas, text, { format: "CODE128", lineColor: color, displayValue: true, background: "#ffffff" });
+        }
+    }
+
+    async function getCanvas() {
+        const text = document.getElementById('textInput').value || "Sample";
+        const color = document.getElementById('mainColor').value;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        if (currentMode === 'qr') {
+            const qrImg = document.querySelector('#qrcode img');
+            canvas.width = 240; canvas.height = 240;
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(qrImg, 20, 20);
+        } else {
+            const barCanvas = document.getElementById('barcodeCanvas');
+            canvas.width = barCanvas.width;
+            canvas.height = barCanvas.height;
+            ctx.drawImage(barCanvas, 0, 0);
+        }
+        return canvas;
+    }
+
+    async function downloadPreview() {
+        const canvas = await getCanvas();
+        const text = document.getElementById('textInput').value.substring(0, 10);
+        saveAs(canvas.toDataURL("image/jpeg", 0.9), `Code_${text}.jpg`);
+    }
+
+    function addToBatch() {
+        const text = document.getElementById('textInput').value || "Code";
+        batchData.push({ text, color: document.getElementById('mainColor').value, mode: currentMode });
+        renderBatch();
+    }
+
+    function renderBatch() {
+        const list = document.getElementById('batchItems');
+        list.innerHTML = "";
+        batchData.forEach((item, i) => {
+            list.innerHTML += `<div class="item-row"><span>${i+1}. ${item.text}</span><span style="color:red;cursor:pointer" onclick="batchData.splice(${i},1);renderBatch()">Remove</span></div>`;
+        });
+        document.getElementById('batchCount').innerText = batchData.length;
+        document.getElementById('downloadZip').disabled = batchData.length === 0;
+    }
+
+    function clearBatch() { batchData = []; renderBatch(); }
+
+    async function generateZip() {
+        const zip = new JSZip();
+        for (let i = 0; i < batchData.length; i++) {
+            const item = batchData[i];
+            const canvas = document.createElement('canvas');
+            if (item.mode === 'qr') {
+                const d = document.createElement('div');
+                new QRCode(d, { text: item.text, width: 400, height: 400, colorDark: item.color });
+                await new Promise(r => setTimeout(r, 100));
+                const img = d.querySelector('img');
+                canvas.width = 440; canvas.height = 440;
+                canvas.getContext('2d').fillStyle = "white";
+                canvas.getContext('2d').fillRect(0,0,440,440);
+                canvas.getContext('2d').drawImage(img, 20, 20);
+            } else {
+                JsBarcode(canvas, item.text, { format: "CODE128", lineColor: item.color, displayValue: true, background: "#ffffff" });
+            }
+            zip.file(`${i+1}_${item.text.replace(/\W/g, '_')}.jpg`, canvas.toDataURL("image/jpeg", 0.8).split(',')[1], {base64: true});
+        }
+        zip.generateAsync({type:"blob"}).then(c => saveAs(c, "Batch_Codes.zip"));
+    }
+
+    window.onload = updatePreview;
+</script>
+
+</body>
+</html>
